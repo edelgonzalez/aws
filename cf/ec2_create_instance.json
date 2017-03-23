@@ -1,0 +1,115 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "EC2 instance simple example ",
+    "Parameters":{
+      "AmiID": {
+        "Type":"String",
+        "Default": "ami-e13739f6"
+      },
+      "KeyPair": {
+        "Type": "AWS::EC2::KeyPair::KeyName",
+        "Default": "tmcaws-dev-key"
+      }
+    },
+    "Resources": {
+        "EC2InstanceTest": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "ImageId": {"Ref": "AmiID"},
+                "KeyName": {"Ref": "KeyPair"},
+                "InstanceType": "t2.medium",
+                "IamInstanceProfile": {
+                  "Ref": "TestInstanceProfile"
+                },
+                "UserData": {
+                  "Fn::Base64": {
+                    "Fn::Join": [
+                      "",
+                      [
+                        "#!/bin/bash\n",
+                        "cd ~\n",
+                        "apt-get update &&  apt-get install -y python2.7\n",
+                        "curl -O https://bootstrap.pypa.io/get-pip.py\n",
+                        "python2.7 get-pip.py\n",
+                        "pip install awscli\n",
+                        "pip install --upgrade awscli\n",
+                        "aws s3 ls s3://tmcaws.artifacts/"
+                      ]
+                    ]
+                  }
+                }
+            }
+        },
+        "TestRole": {
+          "Type": "AWS::IAM::Role",
+          "Properties": {
+            "AssumeRolePolicyDocument": {
+              "Statement":[
+                {
+                  "Effect": "Allow",
+                  "Principal": {
+                    "Service": [
+                      "ec2.amazonaws.com"
+                    ]
+                  },
+                  "Action":[
+                    "sts:AssumeRole"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "TestRolePolicy": {
+          "Type": "AWS::IAM::Policy",
+          "Properties": {
+            "PolicyName": "testPolicy",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "s3:ListBucket",
+                  "Resource": "*"
+                }
+              ]
+            },
+            "Roles":[
+              {
+                "Ref": "TestRole"
+              }
+            ]
+          }
+        },
+        "TestRolePolicy2": {
+          "Type": "AWS::IAM::Policy",
+          "Properties": {
+            "PolicyName": "testPolicy2",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": "s3:GetObject",
+                  "Resource": "*"
+                }
+              ]
+            },
+            "Roles":[
+              {
+                "Ref": "TestRole"
+              }
+            ]
+          }
+        },
+        "TestInstanceProfile": {
+          "Type": "AWS::IAM::InstanceProfile",
+          "Properties": {
+            "Path": "/",
+            "Roles": [
+              {
+                "Ref": "TestRole"
+              }
+            ]
+          }
+        }
+    }
+}

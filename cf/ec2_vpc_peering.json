@@ -1,0 +1,165 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "VPC Peering test",
+  "Parameters":{
+    "VPCCIDR":{
+      "Type": "String",
+      "Default": "12.0.0.0/16"
+    },
+    "Subnet1CIDR":{
+      "Type": "String",
+      "Default": "12.0.0.0/24"
+    },
+    "Subnet2CIDR":{
+      "Type": "String",
+      "Default": "12.0.1.0/24"
+    },
+    "ImageId":{
+      "Type": "String",
+      "Default": "ami-a95044be"
+    },
+    "KeyPair":{
+      "Type": "String",
+      "Default": "tmcaws-beta3-useast1-test"
+    }
+  },
+  "Resources": {
+    "VPC": {
+      "Type": "AWS::EC2::VPC",
+      "Properties" : {
+        "CidrBlock": { "Ref": "VPCCIDR"}
+      }
+    },
+    "InternetGateway":{
+      "Type": "AWS::EC2::InternetGateway"
+    },
+    "IGVPCAttachment": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "InternetGatewayId": {"Ref": "InternetGateway"},
+        "VpcId": {"Ref": "VPC"}
+      }
+    },
+    "RouteTable":{
+      "Type": "AWS::EC2::RouteTable",
+      "Properties":{
+        "VpcId": {
+          "Ref": "VPC"
+        }
+      }
+    },
+    "Route":{
+      "Type": "AWS::EC2::Route",
+      "Properties":{
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "InternetGateway"
+        },
+        "RouteTableId": {
+          "Ref": "RouteTable"
+        }
+      }
+    },
+    "Subnet1": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": {"Ref": "Subnet1CIDR"},
+        "VpcId": {"Ref": "VPC"},
+        "MapPublicIpOnLaunch": "true"
+      }
+    },
+    "Subnet2": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": {"Ref": "Subnet2CIDR"},
+        "VpcId": {"Ref": "VPC"},
+        "MapPublicIpOnLaunch": "true"
+      }
+    },
+    "SecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties":{
+        "GroupDescription": "SSH access",
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "Instance1": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {"Ref": "ImageId"},
+        "InstanceType": "t1.micro",
+        "SubnetId": {
+          "Ref": "Subnet1"
+        },
+        "Tags": [
+          {"Key": "Name", "Value": "Instance1-sub1" }
+        ],
+        "KeyName": {"Ref": "KeyPair"},
+        "SecurityGroupIds": [
+          {"Ref": "SecurityGroup"}
+        ]
+      }
+    },
+    "Instance2": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {"Ref": "ImageId"},
+        "InstanceType": "t1.micro",
+        "SubnetId": {
+          "Ref": "Subnet1"
+        },
+        "Tags": [
+          {"Key": "Name", "Value": "Instance2-sub1" }
+        ],
+        "KeyName": {"Ref": "KeyPair"},
+        "SecurityGroupIds": [
+          {"Ref": "SecurityGroup"}
+        ]
+      }
+    },
+    "Instance3": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {"Ref": "ImageId"},
+        "InstanceType": "t1.micro",
+        "SubnetId": {
+          "Ref": "Subnet2"
+        },
+        "Tags": [
+          {"Key": "Name", "Value": "Instance3-sub2" }
+        ],
+        "KeyName": {"Ref": "KeyPair"},
+        "SecurityGroupIds": [
+          {"Ref": "SecurityGroup"}
+        ]
+      }
+    },
+    "Instance4": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {"Ref": "ImageId"},
+        "InstanceType": "t1.micro",
+        "SubnetId": {
+          "Ref": "Subnet2"
+        },
+        "Tags": [
+          {"Key": "Name", "Value": "Instance4-sub2" }
+        ],
+        "KeyName": {"Ref": "KeyPair"},
+        "SecurityGroupIds": [
+          {"Ref": "SecurityGroup"}
+        ]
+      }
+    }
+  }
+}

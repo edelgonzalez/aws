@@ -1,0 +1,124 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Test VPC internet access",
+  "Parameters":{
+    "VPCCIDR":{
+      "Type": "String",
+      "Default": "11.0.0.0/16"
+    },
+    "SubnetCIDR":{
+      "Type": "String",
+      "Default": "11.0.0.0/24"
+    },
+    "ImageId":{
+      "Type": "String",
+      "Default": "ami-6869aa05"
+    }
+  },
+  "Resources": {
+    "InternetGateway":{
+      "Type": "AWS::EC2::InternetGateway"
+    },
+    "VPC": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": {
+          "Ref": "VPCCIDR"
+        }
+      }
+    },
+    "IGVPCAttachment": {
+      "DependsOn":[
+        "VPC",
+        "InternetGateway"
+      ],
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "InternetGatewayId": {"Ref": "InternetGateway"},
+        "VpcId": {"Ref": "VPC"}
+      }
+    },
+    "RouteTable":{
+      "DependsOn": ["VPC"],
+      "Type": "AWS::EC2::RouteTable",
+      "Properties":{
+        "VpcId": {
+          "Ref": "VPC"
+        }
+      }
+    },
+    "Route":{
+      "Type": "AWS::EC2::Route",
+      "Properties":{
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "InternetGateway"
+        },
+        "RouteTableId": {
+          "Ref": "RouteTable"
+        }
+      }
+    },
+    "Subnet":{
+      "DependsOn": ["VPC"],
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": {
+          "Ref": "SubnetCIDR"
+        },
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "MapPublicIpOnLaunch": "true"
+      }
+    },
+    "RouteTableSubnetAssociation":{
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "RouteTable"
+        },
+        "SubnetId": {
+          "Ref": "Subnet"
+        }
+      }
+    },
+    "SecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties":{
+        "GroupDescription": "SSH access",
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "Instance": {
+      "DependsOn": ["Subnet"],
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "ImageId": {
+          "Ref": "ImageId"
+        },
+        "InstanceType": "t2.micro",
+        "SubnetId": {
+          "Ref": "Subnet"
+        },
+        "Tags": [
+          {"Key": "Name", "Value": "VPC_TEST" }
+        ],
+        "KeyName": "tmc-on-aws-dev",
+        "SecurityGroupIds": [
+          {"Ref": "SecurityGroup"}
+        ]
+      }
+    }
+  }
+}
