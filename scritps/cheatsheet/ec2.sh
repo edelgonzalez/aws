@@ -10,8 +10,10 @@ aws --region us-west-2  --profile tmc-beta3 ec2 describe-instances --filters "Na
 #List ec2 instances
 aws ec2 describe-instances | jq '.Reservations[].Instances[]|"InstanceId: "+.InstanceId+", PublicIP: "+.PublicIpAddress'
 
+#************
 #List ec2 instances with Tag Name
 aws ec2 describe-instances | jq '.Reservations[].Instances[]|"InstanceId: "+.InstanceId+", PublicIP: "+.PublicIpAddress+", Name: "+ (.Tags[]|select(.Key=="Name").Value)'
+aws ec2 describe-instances | jq '.Reservations[].Instances[]|"InstanceId: "+.InstanceId+", PublicIP: "+.PublicIpAddress+", Private IP: "+.PrivateIpAddress+", Name: "+ (.Tags[]|select(.Key=="Name").Value)'
 
 #List ec2 that contains certain tag
 aws ec2 describe-instances --filters "Name=tag-key,Values=Name"
