@@ -1,0 +1,221 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'ELB and Web server deployment'
+Parameters:
+  BaseAMI:
+    Type: String
+    Default: ami-5e63d13e
+  Key:
+    Type: AWS::EC2::KeyPair::KeyName
+  InstanceType:
+    Type: String
+    Default: t2.micro
+  VPCStackName:
+    Type: String
+  AWSAccessKey:
+    Type: String
+  AWSSecretAccessKey:
+    Type: String
+Resources:
+  WebServer1:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT1H
+    Properties:
+      ImageId: !Ref BaseAMI
+      InstanceType: !Ref InstanceType
+      SubnetId:
+        Fn::ImportValue:
+          !Sub "${VPCStackName}-SubnetId"
+      KeyName: !Ref Key
+      SecurityGroupIds:
+        - Fn::ImportValue:
+            !Sub "${VPCStackName}-WebServerSG"
+      Tags:
+        - Key: Name
+          Value: Nginx-Server1
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Install cfn-signal
+          apt-get -y install python-setuptools
+          easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+          check_error_signal()
+          {
+            RC=$?
+            if [ $RC -ne 0 ]; then
+              cfn-signal -e $RC --stack ${AWS::StackName} --region ${AWS::Region} --resource WebServer1
+              exit $RC
+            fi
+          }
+          # Install Nginx
+          apt-get update
+          apt-get install -y nginx
+          # Configure Nginx
+          mkdir -p /var/log/tdcustom/accesslogs
+          sed -i 's|/var/log/nginx/access.log|/var/log/tdcustom/accesslogs/access.log|' /etc/nginx/nginx.conf
+          echo "server { listen 8900; }" > /etc/nginx/conf.d/server.conf
+          service nginx restart
+          cfn-signal -e $? --stack ${AWS::StackName} --region ${AWS::Region} --resource WebServer1
+  WebServer2:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT1H
+    Properties:
+      ImageId: !Ref BaseAMI
+      InstanceType: !Ref InstanceType
+      SubnetId:
+        Fn::ImportValue:
+          !Sub "${VPCStackName}-SubnetId"
+      KeyName: !Ref Key
+      SecurityGroupIds:
+        - Fn::ImportValue:
+            !Sub "${VPCStackName}-WebServerSG"
+      Tags:
+        - Key: Name
+          Value: Nginx-Server2
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Install cfn-signal
+          apt-get -y install python-setuptools
+          easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+          check_error_signal()
+          {
+            RC=$?
+            if [ $RC -ne 0 ]; then
+              cfn-signal -e $RC --stack ${AWS::StackName} --region ${AWS::Region} --resource WebServer2
+              exit $RC
+            fi
+          }
+          # Install Nginx
+          apt-get update
+          apt-get install -y nginx
+          # Configure Nginx
+          mkdir -p /var/log/tdcustom/accesslogs
+          sed -i 's|/var/log/nginx/access.log|/var/log/tdcustom/accesslogs/access.log|' /etc/nginx/nginx.conf
+          echo "server { listen 8900; }" > /etc/nginx/conf.d/server.conf
+          service nginx restart
+          cfn-signal -e $? --stack ${AWS::StackName} --region ${AWS::Region} --resource WebServer2
+  WebServer3:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT1H
+    Properties:
+      ImageId: !Ref BaseAMI
+      InstanceType: !Ref InstanceType
+      SubnetId:
+        Fn::ImportValue:
+          !Sub "${VPCStackName}-SubnetId"
+      KeyName: !Ref Key
+      SecurityGroupIds:
+        - Fn::ImportValue:
+            !Sub "${VPCStackName}-WebServerSG"
+      Tags:
+        - Key: Name
+          Value: Node-Server3
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Install cfn-signal
+          apt-get -y install python-setuptools
+          easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+          check_error_signal()
+          {
+            RC=$?
+            if [ $RC -ne 0 ]; then
+              cfn-signal -e $RC --stack ${AWS::StackName} --region ${AWS::Region} --resource WebServer3
+              exit $RC
+            fi
+          }
+          #Install NodeJS
+          apt-get update
+          apt-get install python-software-properties
+          curl -sL https://deb.nodesource.com/setup_7.x | sudo -E bash -
+          apt-get install -y nodejs
+          cat <<'EOF' > /home/ubuntu/web.js
+          var http = require('http');
+          var server = http.createServer(function(req, res) {
+            res.writeHead(200);
+            res.end('<h1>Hello Teradata from NodeJS</h1>');
+          });
+          console.log("Listening on port 8900");
+          server.listen(8900);
+          EOF
+          cfn-signal -e $? --stack ${AWS::StackName} --region ${AWS::Region} --resource WebServer3
+          su -c "node /home/ubuntu/web.js" -s /bin/sh ubuntu
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      Listeners:
+        - LoadBalancerPort: 80
+          InstancePort: 8900
+          Protocol: HTTP
+      Instances:
+        - !Ref WebServer1
+        - !Ref WebServer2
+        - !Ref WebServer3
+      Subnets:
+        - Fn::ImportValue:
+            !Sub "${VPCStackName}-SubnetId"
+      SecurityGroups:
+        - Fn::ImportValue:
+            !Sub "${VPCStackName}-ELBSG"
+  BastionHost:
+    DependsOn: LoadBalancer
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT1H
+    Properties:
+      ImageId: !Ref BaseAMI
+      InstanceType: !Ref InstanceType
+      SubnetId:
+        Fn::ImportValue:
+          !Sub "${VPCStackName}-SubnetId"
+      KeyName: !Ref Key
+      SecurityGroupIds:
+        - Fn::ImportValue:
+            !Sub "${VPCStackName}-SSHSecurityGroup"
+      Tags:
+        - Key: Name
+          Value: BastionHost
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Install cfn-signal
+          echo `pwd` > ~/pathpath
+          apt-get -y install python-setuptools
+          easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+          check_error_signal()
+          {
+            RC=$?
+            if [ $RC -ne 0 ]; then
+              cfn-signal -e $RC --stack ${AWS::StackName} --region ${AWS::Region} --resource WebServer3
+              exit $RC
+            fi
+          }
+          # Install AWS CLI/Tools
+          apt-get install -y jq
+          curl -O https://bootstrap.pypa.io/get-pip.py
+          python2.7 get-pip.py
+          pip install awscli
+          export AWS_ACCESS_KEY_ID=${AWSAccessKey}
+          export AWS_SECRET_ACCESS_KEY=${AWSSecretAccessKey}
+          # Generate self signed certificate
+          openssl genrsa -des3 -passout pass:x -out server.pass.key 2048
+          openssl rsa -passin pass:x -in server.pass.key -out server.key
+          rm server.pass.key
+          openssl req -new -key server.key -out server.csr  -subj "/C=US/ST=California/L=San Diego/O=Teradata/OU=IntelliCloud/CN=teradata.com"
+          openssl x509 -req -days 365 -in server.csr -signkey server.key -out server.crt
+          # Configure https listener
+          aws iam upload-server-certificate --server-certificate-name WebServer --certificate-body file://server.crt --private-key file://server.key
+          CERT_ARN=`aws iam get-server-certificate --server-certificate-name WebServer | jq -r '.ServerCertificate.ServerCertificateMetadata.Arn'`
+          aws --region us-west-2 elb create-load-balancer-listeners --load-balancer-name ${LoadBalancer} --listeners Protocol=HTTPS,LoadBalancerPort=443,InstanceProtocol=HTTP,InstancePort=8900,SSLCertificateId=$CERT_ARN
+          cfn-signal -e $? --stack ${AWS::StackName} --region ${AWS::Region} --resource BastionHost

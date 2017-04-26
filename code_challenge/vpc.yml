@@ -1,0 +1,140 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'VPC for TD code challenge'
+Parameters:
+  VPCCIDR:
+    Type: String
+    Default: '10.70.12.0/24'
+  CandidateCIDR:
+    Type: String
+Resources:
+  TDVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCCIDR
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: !Ref VPCCIDR
+      VpcId: !Ref TDVPC
+      MapPublicIpOnLaunch: true
+  TDIntGW:
+    Type: AWS::EC2::InternetGateway
+  IGVPCAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref TDIntGW
+      VpcId: !Ref TDVPC
+  InternetAccessRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref TDVPC
+  InternetAccessRoute:
+    DependsOn: IGVPCAttachment
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref TDIntGW
+      RouteTableId: !Ref InternetAccessRouteTable
+  IAccessSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Subnet
+      RouteTableId: !Ref InternetAccessRouteTable
+  SSHSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'SSH Security Group'
+      VpcId: !Ref TDVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref CandidateCIDR
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: '141.206.246.10/32'
+  ELBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'ELB Security Group'
+      VpcId: !Ref TDVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref CandidateCIDR
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: '141.206.246.10/32'
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: '141.206.246.10/32'
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref CandidateCIDR
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: '141.206.246.10/32'
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref CandidateCIDR
+  WebServerSG:
+    DependsOn: ELBSG
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'Web Access Security Group'
+      VpcId: !Ref TDVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref CandidateCIDR
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: '141.206.246.10/32'
+        - IpProtocol: tcp
+          FromPort: 8900
+          ToPort: 8900
+          CidrIp: '141.206.246.10/32'
+        - IpProtocol: tcp
+          FromPort: 8900
+          ToPort: 8900
+          CidrIp: !Ref CandidateCIDR
+        - IpProtocol: tcp
+          FromPort: 8900
+          ToPort: 8900
+          SourceSecurityGroupId: !Ref ELBSG
+Outputs:
+  VPCId:
+    Description: "VPC ID"
+    Value: !Ref TDVPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VPCID"
+  SubnetId:
+    Description: "Subnet Id"
+    Value: !Ref Subnet
+    Export:
+      Name: !Sub "${AWS::StackName}-SubnetId"
+  WebServerSG:
+    Description: 'Security group'
+    Value: !Ref WebServerSG
+    Export:
+      Name: !Sub "${AWS::StackName}-WebServerSG"
+  ELBSG:
+    Description: 'ELB Security Group'
+    Value: !Ref ELBSG
+    Export:
+      Name: !Sub "${AWS::StackName}-ELBSG"
+  SSHSecurityGroup:
+    Description: 'SSH Security Group'
+    Value: !Ref SSHSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-SSHSecurityGroup"
