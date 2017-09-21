@@ -56,3 +56,10 @@ aws ec2 describe-instances | jq '.Reservations[].Instances[]|select(.Tags?)|sele
 
 # Describe security groups that belongs to a VPC, display just description and security group id
 aws ec2 describe-security-groups | jq '.SecurityGroups[]|select(.VpcId=="vpc-49c5bb2e")|[.Description, .GroupId]|@tsv'
+
+
+# Get list of instances with .Tags[] elements, and list Tag Name, State and private IP associate-public-ip-address
+aws ec2 describe-instances | jq '.Reservations[].Instances[]|select(.Tags?)|[(.Tags[]|select(.Key=="Name")).Value,.State.Name,.PrivateIpAddress]|@csv'
+
+# Get list of active VPN connections
+ aws ec2 describe-vpn-connections | jq '.VpnConnections[]|select(.State=="available")|[select(.Tags?)|(.Tags[]|select(.Key=="Name")).Value,.VpnGatewayId,.CustomerGatewayId,.State]|@csv'
